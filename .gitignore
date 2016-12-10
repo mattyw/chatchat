@@ -1,0 +1,4 @@
+*.swp
+charm/chatchat/deps/
+charm/chatchat/files/chatchat
+charm/chatchat/trusty/
