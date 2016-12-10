@@ -1,0 +1,6 @@
+name: chatchat
+summary: chat chat server
+maintainer: mattyw <gh@mattyw.net>
+description: |
+  chat chat server
+subordinate: false
