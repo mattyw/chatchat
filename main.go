@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"net"
 	"sync"
@@ -25,6 +26,11 @@ func (c *chatRoom) ReadAll() {
 			c.writeAll(conn.RemoteAddr().String(), b)
 		}()
 	}
+}
+
+func (c *chatRoom) welcomeMessgae(conn net.Conn) {
+	msg := []byte(fmt.Sprintf("Welcome to chatchat, there are %d people here\n", len(c.participants)))
+	conn.Write(msg)
 }
 
 func (c *chatRoom) writeAll(sender string, p []byte) {
@@ -71,6 +77,7 @@ func main() {
 		go func(c net.Conn) {
 			// Add to chat room
 			room.AddPerson(c)
+			room.welcomeMessgae(c)
 			for {
 				time.Sleep(10e9)
 			}
