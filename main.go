@@ -9,8 +9,13 @@ import (
 	"time"
 )
 
+type participant struct {
+	net.Conn
+	close chan struct{}
+}
+
 type chatRoom struct {
-	participants map[string]net.Conn
+	participants map[string]participant
 	lock         sync.Mutex
 	chatter      [][]byte
 }
@@ -21,14 +26,16 @@ func (c *chatRoom) ReadAll() {
 			reader := bufio.NewReader(conn)
 			b, err := reader.ReadBytes('\n')
 			if err != nil {
-				panic(err)
+				panic(err) // TODO Work out how to deal with this
+				//log.Println(err)
+				c.RemovePerson(conn.RemoteAddr().String(), err)
 			}
 			c.writeAll(conn.RemoteAddr().String(), b)
 		}()
 	}
 }
 
-func (c *chatRoom) welcomeMessgae(conn net.Conn) {
+func (c *chatRoom) welcomeMessage(conn net.Conn) {
 	msg := []byte(fmt.Sprintf("Welcome to chatchat, there are %d people here\n", len(c.participants)))
 	conn.Write(msg)
 }
@@ -49,14 +56,21 @@ func (c *chatRoom) RunRoom() {
 	}
 }
 
-func (c *chatRoom) AddPerson(p net.Conn) {
+func (c *chatRoom) AddPerson(p net.Conn, ch chan struct{}) {
 	log.Printf("adding chatter %v", p.RemoteAddr().String())
-	c.participants[p.RemoteAddr().String()] = p
+	c.participants[p.RemoteAddr().String()] = participant{p, ch}
+}
+
+func (c *chatRoom) RemovePerson(id string, err error) {
+	log.Printf("removing chatter %v because %v", id, err)
+	ch := c.participants[id].close
+	ch <- struct{}{}
+	delete(c.participants, id)
 }
 
 func main() {
 	room := &chatRoom{
-		participants: map[string]net.Conn{},
+		participants: map[string]participant{},
 	}
 	go room.RunRoom()
 	// Listen on TCP port 2000 on all interfaces.
@@ -76,11 +90,10 @@ func main() {
 		// multiple connections may be served concurrently.
 		go func(c net.Conn) {
 			// Add to chat room
-			room.AddPerson(c)
-			room.welcomeMessgae(c)
-			for {
-				time.Sleep(10e9)
-			}
+			ch := make(chan struct{})
+			room.AddPerson(c, ch)
+			room.welcomeMessage(c)
+			<-ch
 			// Shut down the connection.
 			c.Close()
 		}(conn)
